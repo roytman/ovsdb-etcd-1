@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"reflect"
 	"strings"
 )
 
@@ -464,6 +465,14 @@ func (columnSchema *ColumnSchema) Default() interface{} {
 	default:
 		panic(fmt.Sprintf("Unsupported type %s", columnSchema.Type))
 	}
+}
+
+func (columnSchema *ColumnSchema) IsDefault(value interface{}) (bool, error) {
+	v, err := columnSchema.Unmarshal(value)
+	if err != nil {
+		return false, err
+	}
+	return reflect.DeepEqual(columnSchema.Default(), v), nil
 }
 
 func (tableSchema *TableSchema) Default(row *map[string]interface{}) {

@@ -350,6 +350,10 @@ func (u *updater) prepareDeleteRowUpdate(event *clientv3.Event) (*ovsjson.RowUpd
 	if err != nil {
 		return nil, "", err
 	}
+	data, err = u.deleteUnsetColumns(data)
+	if err != nil {
+		return nil, "", err
+	}
 	if len(data) > 0 {
 		// the delete for !u.isV1 we have returned before
 		return &ovsjson.RowUpdate{Old: &data}, uuid, nil
@@ -368,6 +372,10 @@ func (u *updater) prepareCreateRowUpdate(event *clientv3.Event) (*ovsjson.RowUpd
 		return nil, "", err
 	}
 	if len(data) > 0 {
+		data, err = u.deleteUnsetColumns(data)
+		if err != nil {
+			return nil, "", err
+		}
 		if !u.isV1 {
 			return &ovsjson.RowUpdate{Insert: &data}, uuid, nil
 		}
@@ -392,45 +400,56 @@ func (u *updater) prepareModifyRowUpdate(event *clientv3.Event) (*ovsjson.RowUpd
 	if uuid != prevUUID {
 		return nil, "", fmt.Errorf("UUID was changed prev uuid=%q, new uuid=%q", prevUUID, uuid)
 	}
-	deltaRow := map[string]interface{}{}
-	u.compareModifiedRows(modifiedRow, prevRow, deltaRow)
+	deltaRow, err := u.compareModifiedRows(modifiedRow, prevRow)
+	if err != nil {
+		return nil, "", err
+	}
 	klog.V(5).Infof("deltaRow size is %d", len(deltaRow))
 	if len(deltaRow) > 0 {
 		if !u.isV1 {
 			return &ovsjson.RowUpdate{Modify: &deltaRow}, uuid, nil
+		}
+		modifiedRow, err = u.deleteUnsetColumns(modifiedRow)
+		if err != nil {
+			return nil, "", err
 		}
 		return &ovsjson.RowUpdate{New: &modifiedRow, Old: &deltaRow}, uuid, nil
 	}
 	return nil, "", nil
 }
 
-func (u *updater) compareModifiedRows(modifiedRow, prevRow, deltaRow map[string]interface{}) error {
+func (u *updater) compareModifiedRows(modifiedRow, prevRow map[string]interface{}) (map[string]interface{}, error) {
 	// the deltaRow will be "modified" in V2 or "old: in V1
+	deltaRow := map[string]interface{}{}
 	for column, cValue := range modifiedRow {
 		var newValue interface{}
 		if !reflect.DeepEqual(cValue, prevRow[column]) {
-			columnSchema, err := u.tableSchema.LookupColumn(column)
-			if err != nil {
-				return err
-			}
-			if columnSchema.Type == libovsdb.TypeMap {
-				deltaMap, err := u.compareMaps(modifiedRow[column], prevRow[column], columnSchema)
-				if err != nil {
-					return err
-				}
-				if len(deltaMap.GoMap) > 0 {
-					newValue = deltaMap
-				}
-			} else if columnSchema.Type == libovsdb.TypeSet {
-				deltaSet, err := u.compareSets(modifiedRow[column], prevRow[column], columnSchema)
-				if err != nil {
-					return err
-				}
-				if len(deltaSet.GoSet) > 0 {
-					newValue = deltaSet
-				}
-			} else {
+			if column == COL_VERSION || column == COL_VERSION {
 				newValue = modifiedRow[column]
+			} else {
+				columnSchema, err := u.tableSchema.LookupColumn(column)
+				if err != nil {
+					return nil, err
+				}
+				if columnSchema.Type == libovsdb.TypeMap {
+					deltaMap, err := u.compareMaps(modifiedRow[column], prevRow[column], columnSchema)
+					if err != nil {
+						return nil, err
+					}
+					if len(deltaMap.GoMap) > 0 {
+						newValue = deltaMap
+					}
+				} else if columnSchema.Type == libovsdb.TypeSet {
+					deltaSet, err := u.compareSets(modifiedRow[column], prevRow[column], columnSchema)
+					if err != nil {
+						return nil, err
+					}
+					if len(deltaSet.GoSet) > 0 {
+						newValue = deltaSet
+					}
+				} else {
+					newValue = modifiedRow[column]
+				}
 			}
 		}
 		if newValue != nil {
@@ -441,7 +460,7 @@ func (u *updater) compareModifiedRows(modifiedRow, prevRow, deltaRow map[string]
 			}
 		}
 	}
-	return nil
+	return deltaRow, nil
 }
 
 func (u *updater) compareMaps(data, prevData interface{}, columnSchema *libovsdb.ColumnSchema) (*libovsdb.OvsMap, error) {
@@ -500,6 +519,10 @@ func (u *updater) prepareCreateRowInitial(value *[]byte) (*ovsjson.RowUpdate, st
 		return nil, "", err
 	}
 	if len(data) > 0 {
+		data, err = u.deleteUnsetColumns(data)
+		if err != nil {
+			return nil, "", err
+		}
 		if !u.isV1 {
 			return &ovsjson.RowUpdate{Initial: &data}, uuid, nil
 		}
@@ -520,6 +543,27 @@ func (u *updater) deleteUnselectedColumns(data map[string]interface{}) map[strin
 		return newData
 	}
 	return data
+}
+
+func (u *updater) deleteUnsetColumns(data map[string]interface{}) (map[string]interface{}, error) {
+	newData := map[string]interface{}{}
+	for cName, cValue := range data {
+		if cName == COL_VERSION || cName == COL_UUID {
+			continue
+		}
+		columnSchema, err := u.tableSchema.LookupColumn(cName)
+		if err != nil {
+			return nil, err
+		}
+		ok, err := columnSchema.IsDefault(cValue)
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			newData[cName] = cValue
+		}
+	}
+	return newData, nil
 }
 
 func unmarshalData(data []byte) (map[string]interface{}, error) {
