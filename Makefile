@@ -161,6 +161,16 @@ ovnkube-deploy: check-env
 		--ovndb-etcd-tcpdump "${OVNDB_ETCD_TCPDUMP}" \
 		$(KIND_FLAGS)
 
+.PHONY: ovnkube-1-deploy
+ovnkube-1-deploy: check-env
+	cd ${OVN_KUBERNETES_ROOT}/go-controller && make
+	cd ${OVN_KUBERNETES_ROOT}/contrib && ./kind.sh \
+		--ovn-etcd-image "${OVSDB_ETCD_REPOSITORY}/etcd:latest" \
+		--ovn-ovsdb-etcd-image "${OVSDB_ETCD_REPOSITORY}/ovsdb-etcd:latest" \
+		--ovndb-etcd-tcpdump "${OVNDB_ETCD_TCPDUMP}" \
+		$(KIND_FLAGS)
+
+
 .PHONY: ovnkube-deploy-org
 ovnkube-deploy-org: check-env
 	cd ${OVN_KUBERNETES_ROOT} && git checkout d0fdcfbbb2702ed8482a0c1f6ba4561273399fdc

@@ -2,7 +2,7 @@ FROM fedora:33
 
 # install needed rpms
 RUN INSTALL_PKGS=" \
-	hostname kubernetes-client tcpdump procps openvswitch-test ovn \
+	hostname kubernetes-client tcpdump procps openvswitch-test ovn ovn-central \
         " && \
 	dnf install --best --refresh -y --setopt=tsflags=nodocs $INSTALL_PKGS && \
 	dnf clean all && rm -rf /var/cache/dnf/*
