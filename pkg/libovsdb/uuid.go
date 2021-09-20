@@ -6,6 +6,10 @@ import (
 	"regexp"
 )
 
+const (
+	UUID_STR = "uuid"
+	NAMED_UUID_STR = "named-uud"
+)
 // UUID is a UUID according to RFC7047
 type UUID struct {
 	GoUUID string `json:"uuid"`
@@ -16,9 +20,9 @@ func (u UUID) MarshalJSON() ([]byte, error) {
 	var uuidSlice []string
 	err := u.ValidateUUID()
 	if err == nil {
-		uuidSlice = []string{"uuid", u.GoUUID}
+		uuidSlice = []string{UUID_STR, u.GoUUID}
 	} else {
-		uuidSlice = []string{"named-uuid", u.GoUUID}
+		uuidSlice = []string{NAMED_UUID_STR, u.GoUUID}
 	}
 
 	return json.Marshal(uuidSlice)
@@ -32,6 +36,8 @@ func (u *UUID) UnmarshalJSON(b []byte) (err error) {
 	}
 	return err
 }
+
+
 
 func (u UUID) ValidateUUID() error {
 	if len(u.GoUUID) != 36 {

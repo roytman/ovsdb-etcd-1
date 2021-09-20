@@ -16,7 +16,7 @@ func (r *Row) UnmarshalJSON(b []byte) (err error) {
 	var raw map[string]interface{}
 	err = json.Unmarshal(b, &raw)
 	for key, val := range raw {
-		val, err = ovsSliceToGoNotation(val)
+		val, err = OvsSliceToGoNotation(val)
 		if err != nil {
 			return err
 		}
@@ -50,7 +50,7 @@ func (r *ResultRow) UnmarshalJSON(b []byte) (err error) {
 	var raw map[string]interface{}
 	err = json.Unmarshal(b, &raw)
 	for key, val := range raw {
-		val, err = ovsSliceToGoNotation(val)
+		val, err = OvsSliceToGoNotation(val)
 		if err != nil {
 			return err
 		}

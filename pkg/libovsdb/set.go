@@ -56,7 +56,7 @@ func (o OvsSet) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON will unmarshal a JSON byte array to an OVSDB style Set
 func (o *OvsSet) UnmarshalJSON(b []byte) (err error) {
 	addToSet := func(o *OvsSet, v interface{}) error {
-		goVal, err := ovsSliceToGoNotation(v)
+		goVal, err := OvsSliceToGoNotation(v)
 		if err == nil {
 			o.GoSet = append(o.GoSet, goVal)
 		}

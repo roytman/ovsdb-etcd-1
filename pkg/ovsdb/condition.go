@@ -316,6 +316,13 @@ func (c *Condition) CompareEnum(row *map[string]interface{}) (bool, error) {
 
 func (c *Condition) CompareSet(row *map[string]interface{}) (bool, error) {
 	var err error
+	val, ok := (*row)[c.Column]
+	if !ok {
+		err = errors.New(E_CONSTRAINT_VIOLATION)
+		c.Log.Error(err, "there is no value")
+		return false, err
+	}
+	val = libovsdb.
 	var actual libovsdb.OvsSet
 	switch data := (*row)[c.Column].(type) {
 	case libovsdb.OvsSet:

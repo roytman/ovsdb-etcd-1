@@ -107,8 +107,8 @@ type transactionsQueue struct {
 }
 
 type ovsdbKeyValue struct {
-	key common.Key
-	row libovsdb.Row
+	key   common.Key
+	value map[string]interface{}
 }
 type ovsdbNotificationEvent struct {
 	createEvent bool
@@ -130,20 +130,18 @@ func etcd2ovsdbEvent(event *clientv3.Event) (*ovsdbNotificationEvent, error) {
 		// delete event
 		ovsdbEvent.kv = &ovsdbKeyValue{key: *key}
 	} else {
-		var row libovsdb.Row
-		err = row.UnmarshalJSON(event.Kv.Value)
+		data, err := unmarshalData(event.Kv.Value)
 		if err != nil {
 			return nil, err
 		}
-		ovsdbEvent.kv = &ovsdbKeyValue{key: *key, row: row}
+		ovsdbEvent.kv = &ovsdbKeyValue{key: *key, value: data}
 	}
 	if !ovsdbEvent.createEvent {
-		var pRow libovsdb.Row
-		err = pRow.UnmarshalJSON(event.PrevKv.Value)
+		data, err := unmarshalData(event.PrevKv.Value)
 		if err != nil {
 			return nil, err
 		}
-		ovsdbEvent.prevKv = &ovsdbKeyValue{key: *key, row: pRow}
+		ovsdbEvent.prevKv = &ovsdbKeyValue{key: *key, value: data}
 	}
 	return &ovsdbEvent, nil
 }
@@ -444,14 +442,14 @@ func (u *updater) prepareDeleteRowUpdate(event *ovsdbNotificationEvent) (*ovsjso
 	if !u.isV1 {
 		// according to https://docs.openvswitch.org/en/latest/ref/ovsdb-server.7/#update2-notification,
 		// "<row> is always a null object for delete updates."
-		_, uuid, err := u.prepareRow(&event.prevKv.row)
+		_, uuid, err := u.prepareRow(event.prevKv.value)
 		if err != nil {
 			return nil, "", err
 		}
 		return &ovsjson.RowUpdate{Delete: true}, uuid, nil
 	}
 
-	data, uuid, err := u.prepareRow(&event.prevKv.row)
+	data, uuid, err := u.prepareRow(event.prevKv.value)
 	if err != nil {
 		return nil, "", err
 	}
@@ -463,7 +461,7 @@ func (u *updater) prepareCreateRowUpdate(event *ovsdbNotificationEvent) (*ovsjso
 	if !libovsdb.MSIsTrue(u.mcr.Select.Insert) {
 		return nil, "", nil
 	}
-	data, uuid, err := u.prepareRow(&event.kv.row)
+	data, uuid, err := u.prepareRow(event.kv.value)
 	if err != nil {
 		return nil, "", err
 	}
@@ -477,11 +475,11 @@ func (u *updater) prepareModifyRowUpdate(event *ovsdbNotificationEvent) (*ovsjso
 	if !libovsdb.MSIsTrue(u.mcr.Select.Modify) {
 		return nil, "", nil
 	}
-	modifiedRow, uuid, err := u.prepareRow(&event.kv.row)
+	modifiedRow, uuid, err := u.prepareRow(event.kv.value)
 	if err != nil {
 		return nil, "", err
 	}
-	prevRow, prevUUID, err := u.prepareRow(&event.prevKv.row)
+	prevRow, prevUUID, err := u.prepareRow(event.prevKv.value)
 	if err != nil {
 		return nil, "", err
 	}
@@ -601,19 +599,19 @@ func (u *updater) prepareInitialRow(value *[]byte) (*ovsjson.RowUpdate, string, 
 	if !libovsdb.MSIsTrue(u.mcr.Select.Initial) {
 		return nil, "", nil
 	}
-	var row libovsdb.Row
-	err := row.UnmarshalJSON(*value)
+	data, err := unmarshalData(*value)
 	if err != nil {
 		return nil, "", err
 	}
-	data, uuid, err := u.prepareRow(&row)
+
+	row, uuid, err := u.prepareRow(data)
 	if err != nil {
 		return nil, "", err
 	}
 	if !u.isV1 {
-		return &ovsjson.RowUpdate{Initial: &data}, uuid, nil
+		return &ovsjson.RowUpdate{Initial: &row}, uuid, nil
 	}
-	return &ovsjson.RowUpdate{New: &data}, uuid, nil
+	return &ovsjson.RowUpdate{New: &row}, uuid, nil
 }
 
 func (u *updater) deleteUnselectedColumns(data map[string]interface{}) map[string]interface{} {
@@ -694,8 +692,7 @@ func (u *updater) isRowAppearOnWhere(data map[string]interface{}) (bool, error) 
 	return true, nil
 }
 
-func (u *updater) prepareRow(row *libovsdb.Row) (map[string]interface{}, string, error) {
-	data := row.Fields
+func (u *updater) prepareRow(data map[string]interface{}) (map[string]interface{}, string, error) {
 	res, err := u.isRowAppearOnWhere(data)
 	if err != nil {
 		return nil, "", err
@@ -704,13 +701,21 @@ func (u *updater) prepareRow(row *libovsdb.Row) (map[string]interface{}, string,
 	if res == false {
 		return map[string]interface{}{}, "", nil
 	}
-	uuid, err := row.GetUUID()
-	if err != nil {
-		return nil, "", err
+	uuidInt, ok := data[libovsdb.COL_UUID]
+	if !ok {
+		return nil, "", fmt.Errorf("row doesn't contain %s",libovsdb.COL_UUID)
+	}
+	ovsUUID, ok := uuidInt.([]interface{})
+	if !ok {
+		return nil, "", fmt.Errorf("uuid is not a slice of strings, it is %T", uuidInt)
+	}
+	uuid, ok  := ovsUUID[1].(string)
+	if !ok {
+		return nil, "", fmt.Errorf("uuid is not a strings, it is %T", ovsUUID[1])
 	}
 	data = u.copySelectedColumns(data)
 	delete(data, libovsdb.COL_UUID)
-	return data, uuid.GoUUID, nil
+	return data, uuid, nil
 }
 
 // setsDifference returns a delta between 2 sets. It assumes that there is no duplicate elements in the sets.

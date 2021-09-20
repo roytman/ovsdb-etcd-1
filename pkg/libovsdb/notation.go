@@ -242,7 +242,7 @@ func (res *OperationResult) AppendRows(row ResultRow) {
 	*res.Rows = append(*res.Rows, row)
 }
 
-func ovsSliceToGoNotation(val interface{}) (interface{}, error) {
+func OvsSliceToGoNotation(val interface{}) (interface{}, error) {
 	switch val.(type) {
 	case []interface{}:
 		sl := val.([]interface{})

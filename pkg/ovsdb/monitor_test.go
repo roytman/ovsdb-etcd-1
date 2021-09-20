@@ -50,23 +50,22 @@ func TestMonitorPrepareRowCheckColumns(t *testing.T) {
 	tableSchema := createTestTableSchema()
 	data := map[string]interface{}{"c1": "v1", "c2": "v2"}
 	expectedUUID := guuid.NewString()
-	data[libovsdb.COL_UUID] = libovsdb.UUID{GoUUID: expectedUUID}
-	row := &libovsdb.Row{Fields: data}
+	data[libovsdb.COL_UUID] = []interface{}{libovsdb.UUID_STR, expectedUUID}
 
 	// Columns are nil or all columns
 	expRow := map[string]interface{}{"c1": "v1", "c2": "v2"}
-	checkPrepareRow(t, tableSchema, row, false, ovsjson.MonitorCondRequest{}, expRow)
-	checkPrepareRow(t, tableSchema, row, true, ovsjson.MonitorCondRequest{Columns: &[]string{"c1", "c2"}}, expRow)
-	checkPrepareRow(t, tableSchema, row, true, ovsjson.MonitorCondRequest{Columns: &[]string{"c1", "c2"}}, expRow)
+	checkPrepareRow(t, tableSchema, data, false, ovsjson.MonitorCondRequest{}, expRow)
+	checkPrepareRow(t, tableSchema, data, true, ovsjson.MonitorCondRequest{Columns: &[]string{"c1", "c2"}}, expRow)
+	checkPrepareRow(t, tableSchema, data, true, ovsjson.MonitorCondRequest{Columns: &[]string{"c1", "c2"}}, expRow)
 
 	// Columns are empty array or a different column
 	expRow = map[string]interface{}{}
-	checkPrepareRow(t, tableSchema, row, false, ovsjson.MonitorCondRequest{Columns: &[]string{""}}, expRow)
-	checkPrepareRow(t, tableSchema, row, true, ovsjson.MonitorCondRequest{Columns: &[]string{"c3"}}, expRow)
+	checkPrepareRow(t, tableSchema, data, false, ovsjson.MonitorCondRequest{Columns: &[]string{""}}, expRow)
+	checkPrepareRow(t, tableSchema, data, true, ovsjson.MonitorCondRequest{Columns: &[]string{"c3"}}, expRow)
 
 	// Single Column
 	expRow = map[string]interface{}{"c2": "v2"}
-	checkPrepareRow(t, tableSchema, row, false, ovsjson.MonitorCondRequest{Columns: &[]string{"c2"}}, expRow)
+	checkPrepareRow(t, tableSchema, data, false, ovsjson.MonitorCondRequest{Columns: &[]string{"c2"}}, expRow)
 }
 
 func TestMonitorPrepareRowCheckWhere(t *testing.T) {
@@ -90,13 +89,13 @@ func TestMonitorPrepareRowCheckWhere(t *testing.T) {
 	// we need marshal and unmarshal to transfer integers to float64
 	buf, err := json.Marshal(data)
 	assert.Nil(t, err)
-	row := libovsdb.Row{}
-	err = row.UnmarshalJSON(buf)
+
+	row, err := unmarshalData(buf)
 	assert.Nil(t, err)
 
 	emptyRow := map[string]interface{}{}
 	checkWhere := func(Where *[]interface{}, expRow map[string]interface{}) {
-		checkPrepareRow(t, tableSchema, &row, false, ovsjson.MonitorCondRequest{Where: Where}, expRow)
+		checkPrepareRow(t, tableSchema, row, false, ovsjson.MonitorCondRequest{Where: Where}, expRow)
 	}
 
 	// booleans
@@ -255,7 +254,7 @@ func TestMonitorPrepareRowCheckWhere(t *testing.T) {
 	checkWhere(&[]interface{}{[]interface{}{MAP_COLUMN_1, "excludes", libovsdb.OvsMap{GoMap: map[interface{}]interface{}{"key1": "val3", "key2": "val2"}}}}, emptyRow)
 }
 
-func checkPrepareRow(t *testing.T, tableSchema *libovsdb.TableSchema, row *libovsdb.Row, isV1 bool, mcr ovsjson.MonitorCondRequest, expRow map[string]interface{}) {
+func checkPrepareRow(t *testing.T, tableSchema *libovsdb.TableSchema, row map[string]interface{}, isV1 bool, mcr ovsjson.MonitorCondRequest, expRow map[string]interface{}) {
 	updater := *mcrToUpdater(mcr, "", tableSchema, isV1, log)
 	data, _, err := updater.prepareRow(row)
 	assert.Nil(t, err)
@@ -338,7 +337,7 @@ func TestMonitorPrepareInsertRow(t *testing.T) {
 	tableSchema := createTestTableSchema()
 	expectedUUID := guuid.NewString()
 	data := map[string]interface{}{"c1": "v1", "c2": "v2"}
-	data[libovsdb.COL_UUID] = libovsdb.UUID{GoUUID: expectedUUID}
+	data[libovsdb.COL_UUID] = []string{libovsdb.UUID_STR, expectedUUID}
 	dataJson, err := json.Marshal(data)
 	assert.Nilf(t, err, "marshalling %v, threw %v", data, err)
 
@@ -983,15 +982,14 @@ func TestMonitorCondChange(t *testing.T) {
 	}
 	addUuidToRow := func(rowIn map[string]interface{}) (rowOut map[string]interface{}) {
 		expectedUUID := ROW_UUID
-		rowIn[libovsdb.COL_UUID] = libovsdb.UUID{GoUUID: expectedUUID}
+		rowIn[libovsdb.COL_UUID] = []interface{}{libovsdb.UUID_STR, expectedUUID}
 		return rowIn
 	}
 	handlerCallToPrepareRow := func(rowInWithoutUUID map[string]interface{}) map[string]interface{} {
 		rowInWithUUID := addUuidToRow(rowInWithoutUUID)
-		row := &libovsdb.Row{Fields: rowInWithUUID}
 		key := common.NewTableKey(dbName, tableName)
 		updater := handler.monitors[dbName].key2Updaters[key][0]
-		rowOut, _, err := updater.prepareRow(row)
+		rowOut, _, err := updater.prepareRow(rowInWithUUID)
 		assert.Nilf(t, err, " prepareRow threw %v", err)
 		return rowOut
 	}
