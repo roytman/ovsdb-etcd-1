@@ -373,7 +373,7 @@ func (m *Mutation) mutateMap(row *map[string]interface{}) error {
 func (m *Mutation) Mutate(row *map[string]interface{}) error {
 	var err error
 	switch m.column {
-	case libovsdb.COL_UUID, libovsdb.COL_VERSION:
+	case libovsdb.ColUUID, libovsdb.ColVersion:
 		err = errors.New(E_CONSTRAINT_VIOLATION)
 		m.log.Error(err, "can't mutate column", "column", m.column)
 		return err

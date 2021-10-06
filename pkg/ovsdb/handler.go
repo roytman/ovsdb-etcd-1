@@ -487,7 +487,7 @@ func (ch *Handler) addMonitor(params []interface{}, notificationType ovsjson.Upd
 		updatersKeys = append(updatersKeys, key)
 	}
 	log := ch.log.WithValues("jsonValue", cmpr.JsonValue)
-	if cmpr.DatabaseName != INT_SERVER {
+	if cmpr.DatabaseName != InternalServer {
 		monitor, ok := ch.monitors[cmpr.DatabaseName]
 		if !ok {
 			monitor = ch.db.CreateMonitor(cmpr.DatabaseName, ch, log)
@@ -560,7 +560,7 @@ func (ch *Handler) getMonitoredData(dbName string, updatersMap Key2Updaters) (ov
 			continue
 		}
 		tableName := tableKey.TableName
-		tableCache := dbCache.getTable(tableName)
+		tableCache := dbCache.getTableCache(tableName)
 		// validate that Initial is required
 		for _, updater := range updaters {
 			if !libovsdb.MSIsTrue(updater.mcr.Select.Initial) {

@@ -67,7 +67,7 @@ func NewCondition(tableSchema *libovsdb.TableSchema, condition []interface{}, lo
 			return nil, err
 		}
 		value = tmp
-	} else if column == libovsdb.COL_UUID { // TODO add libovsdb.COL_VERSION
+	} else if column == libovsdb.ColUUID { // TODO add libovsdb.ColVersion
 		tmp, err := libovsdb.UnmarshalUUID(value)
 		if err != nil {
 			err = errors.New(E_INTERNAL_ERROR)
@@ -384,7 +384,7 @@ func (c *Condition) CompareMap(row *map[string]interface{}) (bool, error) {
 
 // a short cat for a most usual condition requests, when condition is uuid.
 func (c *Condition) getUUIDIfExists() (string, error) {
-	if c.Column != libovsdb.COL_UUID {
+	if c.Column != libovsdb.ColUUID {
 		return "", nil
 	}
 	if c.Function != FN_EQ && c.Function != FN_IN {

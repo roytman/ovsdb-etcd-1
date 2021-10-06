@@ -298,7 +298,7 @@ func NewTransaction(ctx context.Context, cli *clientv3.Client, request *libovsdb
 
 func (txn *Transaction) getGenerateUUID(ovsOp *libovsdb.Operation) (string, error) {
 	var uuid string
-	tCache := txn.cache.getTable(*ovsOp.Table)
+	tCache := txn.cache.getTableCache(*ovsOp.Table)
 	lCache := txn.localCache.getLocalTableCache(*ovsOp.Table)
 	if ovsOp.UUID != nil {
 		uuid = ovsOp.UUID.GoUUID
@@ -571,7 +571,7 @@ func (txn *Transaction) isSpecificRowSelected(ovsOp *libovsdb.Operation) (bool, 
 			return false, err
 		}
 		if cond.Function == FN_EQ || cond.Function == FN_IN {
-			if cond.Column == libovsdb.COL_UUID {
+			if cond.Column == libovsdb.ColUUID {
 				return true, nil
 			}
 			selectedColumns[cond.Column] = cond.Column
@@ -656,12 +656,12 @@ func makeValue(row *map[string]interface{}) (string, error) {
 }
 
 func setRowUUID(row *map[string]interface{}, uuid string) {
-	(*row)[libovsdb.COL_UUID] = libovsdb.UUID{GoUUID: uuid}
+	(*row)[libovsdb.ColUUID] = libovsdb.UUID{GoUUID: uuid}
 }
 
 func setRowVersion(row *map[string]interface{}) {
 	version := common.GenerateUUID()
-	(*row)[libovsdb.COL_VERSION] = libovsdb.UUID{GoUUID: version}
+	(*row)[libovsdb.ColVersion] = libovsdb.UUID{GoUUID: version}
 }
 
 /*func (txn *Transaction) getUUIDIfExists(tableSchema *libovsdb.TableSchema, mapUUID namedUUIDResolver, cond1 interface{}) (string, error) {
@@ -677,7 +677,7 @@ func setRowVersion(row *map[string]interface{}) {
 		txn.log.Error(err, "failed to create condition", "condition", cond2)
 		return "", err
 	}
-	if condition.Column != libovsdb.COL_UUID {
+	if condition.Column != libovsdb.ColUUID {
 		return "", nil
 	}
 	if condition.Function != FN_EQ && condition.Function != FN_IN {
@@ -807,7 +807,7 @@ func (txn *Transaction) rowUpdate(tableSchema *libovsdb.TableSchema, mapUUID nam
 			return nil, err
 		}
 		switch column {
-		case libovsdb.COL_UUID, libovsdb.COL_VERSION:
+		case libovsdb.ColUUID, libovsdb.ColVersion:
 			err = errors.New(E_CONSTRAINT_VIOLATION)
 			txn.log.Error(err, "failed update of column", "column", column)
 			return nil, err
@@ -942,7 +942,7 @@ func (txn *Transaction) doModify(ovsOp *libovsdb.Operation, ovsResult *libovsdb.
 		err = errors.New(E_INTERNAL_ERROR)
 		return
 	}
-	tCache := txn.cache.getTable(*ovsOp.Table)
+	tCache := txn.cache.getTableCache(*ovsOp.Table)
 	lCache := txn.localCache.getLocalTableCache(*ovsOp.Table)
 	conditions, e := txn.updateConditions(ovsOp)
 	if e != nil {
@@ -1041,7 +1041,7 @@ func (txn *Transaction) doModify(ovsOp *libovsdb.Operation, ovsResult *libovsdb.
 
 /* Select and Delete */
 func (txn *Transaction) doSelectDelete(ovsOp *libovsdb.Operation, ovsResult *libovsdb.OperationResult) (err error, details string) {
-	tCache := txn.cache.getTable(*ovsOp.Table)
+	tCache := txn.cache.getTableCache(*ovsOp.Table)
 	conditions, e := txn.updateConditions(ovsOp)
 	if e != nil {
 		err = errors.New(E_INTERNAL_ERROR)
@@ -1079,6 +1079,7 @@ func (txn *Transaction) doSelectDelete(ovsOp *libovsdb.Operation, ovsResult *lib
 			}
 		}
 		if ovsOp.Op == libovsdb.OperationDelete {
+			// TODO GC remove weak references
 			etcdOp := clientv3.OpDelete(string(kv.Key))
 			txn.etcdTrx.appendThen(etcdOp)
 			ovsResult.IncrementCount()
@@ -1143,7 +1144,7 @@ func (txn *Transaction) doWait(ovsOp *libovsdb.Operation, ovsResult *libovsdb.Op
 		details = "missing table schema"
 	}
 
-	tCache := txn.cache.getTable(*ovsOp.Table)
+	tCache := txn.cache.getTableCache(*ovsOp.Table)
 	conditions, e := txn.updateConditions(ovsOp)
 	if e != nil {
 		err = errors.New(E_INTERNAL_ERROR)

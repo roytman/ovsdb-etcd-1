@@ -110,29 +110,35 @@ func (con *DatabaseEtcd) AddSchema(schemaFile string) error {
 	if err != nil {
 		return err
 	}
+	err = con.schemas.AddFromBytes(data)
+	if err != nil {
+		return err
+	}
+
+	// we need this map[string]interface{} schema representation to correctly serve get get-schema calls.
+	// TODO check possibility to combine with the schemas objects.
 	schemaMap := map[string]interface{}{}
 	err = json.Unmarshal(data, &schemaMap)
 	if err != nil {
 		return err
 	}
-	err = con.schemas.AddFromBytes(data)
-	if err != nil {
-		return err
-	}
 	schemaName := schemaMap["name"].(string)
 	con.strSchemas[schemaName] = schemaMap
-	err = con.cache.addDatabaseCache(schemaName, con.cli, con.log)
+
+	err = con.cache.addDatabaseCache(con.schemas[schemaName],  con.cli, con.log)
 	if err != nil {
 		return err
 	}
+	// add internal _Server.Database row
 	schemaSet, err := libovsdb.NewOvsSet(string(data))
 	if err != nil {
 		return err
 	}
 	srv := _Server.Database{Model: "standalone", Name: schemaName, Uuid: libovsdb.UUID{GoUUID: uuid.NewString()},
 		Connected: true, Leader: true, Schema: *schemaSet, Version: libovsdb.UUID{GoUUID: uuid.NewString()}}
-	key := common.NewDataKey(INT_SERVER, INT_DATABASES, schemaName)
-	dbCache := con.cache.getDBCache(INT_SERVER)
+	//_Server.Database rows are unique per database, so we index them by database name and is not per uuid
+	key := common.NewDataKey(InternalServer, InternalDatabase, schemaName)
+	dbCache := con.cache.getDBCache(InternalServer)
 	val, err := json.Marshal(srv)
 	if err != nil {
 		return err

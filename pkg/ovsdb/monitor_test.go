@@ -50,7 +50,7 @@ func TestMonitorPrepareRowCheckColumns(t *testing.T) {
 	tableSchema := createTestTableSchema()
 	data := map[string]interface{}{"c1": "v1", "c2": "v2"}
 	expectedUUID := guuid.NewString()
-	data[libovsdb.COL_UUID] = libovsdb.UUID{GoUUID: expectedUUID}
+	data[libovsdb.ColUUID] = libovsdb.UUID{GoUUID: expectedUUID}
 	row := &libovsdb.Row{Fields: data}
 
 	// Columns are nil or all columns
@@ -86,7 +86,7 @@ func TestMonitorPrepareRowCheckWhere(t *testing.T) {
 	dataRow := map[string]interface{}{"c1": "v1", "c2": "v2", "r1": 1.5, "i1": 3, "b1": true, SET_COLUMN_0: set0, SET_COLUMN_1: set1, SET_COLUMN_2: set2, MAP_COLUMN_0: map0, MAP_COLUMN_1: map1}
 	data := map[string]interface{}{"c1": "v1", "c2": "v2", "r1": 1.5, "i1": 3, "b1": true, SET_COLUMN_0: set0, SET_COLUMN_1: set1, SET_COLUMN_2: set2, MAP_COLUMN_0: map0, MAP_COLUMN_1: map1}
 	expectedUUID := ROW_UUID
-	data[libovsdb.COL_UUID] = libovsdb.UUID{GoUUID: expectedUUID}
+	data[libovsdb.ColUUID] = libovsdb.UUID{GoUUID: expectedUUID}
 	// we need marshal and unmarshal to transfer integers to float64
 	buf, err := json.Marshal(data)
 	assert.Nil(t, err)
@@ -172,15 +172,15 @@ func TestMonitorPrepareRowCheckWhere(t *testing.T) {
 	checkWhere(&[]interface{}{[]interface{}{"b1", "excludes", true}}, emptyRow)
 
 	// Type UUID
-	checkWhere(&[]interface{}{[]interface{}{libovsdb.COL_UUID, "==", libovsdb.UUID{GoUUID: expectedUUID}}}, dataRow)
-	checkWhere(&[]interface{}{[]interface{}{libovsdb.COL_UUID, "includes", libovsdb.UUID{GoUUID: expectedUUID}}}, dataRow)
-	checkWhere(&[]interface{}{[]interface{}{libovsdb.COL_UUID, "!=", libovsdb.UUID{GoUUID: LAST_TNX}}}, dataRow)
-	checkWhere(&[]interface{}{[]interface{}{libovsdb.COL_UUID, "excludes", libovsdb.UUID{GoUUID: LAST_TNX}}}, dataRow)
+	checkWhere(&[]interface{}{[]interface{}{libovsdb.ColUUID, "==", libovsdb.UUID{GoUUID: expectedUUID}}}, dataRow)
+	checkWhere(&[]interface{}{[]interface{}{libovsdb.ColUUID, "includes", libovsdb.UUID{GoUUID: expectedUUID}}}, dataRow)
+	checkWhere(&[]interface{}{[]interface{}{libovsdb.ColUUID, "!=", libovsdb.UUID{GoUUID: LAST_TNX}}}, dataRow)
+	checkWhere(&[]interface{}{[]interface{}{libovsdb.ColUUID, "excludes", libovsdb.UUID{GoUUID: LAST_TNX}}}, dataRow)
 
-	checkWhere(&[]interface{}{[]interface{}{libovsdb.COL_UUID, "==", libovsdb.UUID{GoUUID: LAST_TNX}}}, emptyRow)
-	checkWhere(&[]interface{}{[]interface{}{libovsdb.COL_UUID, "includes", libovsdb.UUID{GoUUID: LAST_TNX}}}, emptyRow)
-	checkWhere(&[]interface{}{[]interface{}{libovsdb.COL_UUID, "!=", libovsdb.UUID{GoUUID: expectedUUID}}}, emptyRow)
-	checkWhere(&[]interface{}{[]interface{}{libovsdb.COL_UUID, "excludes", libovsdb.UUID{GoUUID: expectedUUID}}}, emptyRow)
+	checkWhere(&[]interface{}{[]interface{}{libovsdb.ColUUID, "==", libovsdb.UUID{GoUUID: LAST_TNX}}}, emptyRow)
+	checkWhere(&[]interface{}{[]interface{}{libovsdb.ColUUID, "includes", libovsdb.UUID{GoUUID: LAST_TNX}}}, emptyRow)
+	checkWhere(&[]interface{}{[]interface{}{libovsdb.ColUUID, "!=", libovsdb.UUID{GoUUID: expectedUUID}}}, emptyRow)
+	checkWhere(&[]interface{}{[]interface{}{libovsdb.ColUUID, "excludes", libovsdb.UUID{GoUUID: expectedUUID}}}, emptyRow)
 
 	// Type Set with Zero elements
 	checkWhere(&[]interface{}{[]interface{}{SET_COLUMN_0, "==", libovsdb.OvsSet{GoSet: []interface{}{}}}}, dataRow)
@@ -274,19 +274,19 @@ func createTestTableSchema() *libovsdb.TableSchema {
 	mapColumnType := libovsdb.ColumnType{Key: &libovsdb.BaseType{Type: "string"}, Value: &libovsdb.BaseType{Type: "string"}}
 	mColumnSchema := libovsdb.ColumnSchema{Type: libovsdb.TypeMap, TypeObj: &mapColumnType}
 	tableSchema.Columns = map[string]*libovsdb.ColumnSchema{
-		"c1":              &columnSchemaString,
-		"c2":              &columnSchemaString,
-		"c3":              &columnSchemaString,
-		"c4":              &columnSchemaString,
-		"r1":              &columnSchemaReal,
-		"i1":              &columnSchemaInt,
-		"b1":              &columnSchemaBool,
-		SET_COLUMN + "0":  &sColumnSchema,
-		SET_COLUMN + "1":  &sColumnSchema,
-		SET_COLUMN + "2":  &sColumnSchema,
-		libovsdb.COL_UUID: &columnSchemaUUID,
-		MAP_COLUMN + "0":  &mColumnSchema,
-		MAP_COLUMN + "1":  &mColumnSchema,
+		"c1":             &columnSchemaString,
+		"c2":             &columnSchemaString,
+		"c3":             &columnSchemaString,
+		"c4":             &columnSchemaString,
+		"r1":             &columnSchemaReal,
+		"i1":             &columnSchemaInt,
+		"b1":             &columnSchemaBool,
+		SET_COLUMN + "0": &sColumnSchema,
+		SET_COLUMN + "1": &sColumnSchema,
+		SET_COLUMN + "2": &sColumnSchema,
+		libovsdb.ColUUID: &columnSchemaUUID,
+		MAP_COLUMN + "0": &mColumnSchema,
+		MAP_COLUMN + "1": &mColumnSchema,
 	}
 	return &tableSchema
 }
@@ -295,7 +295,7 @@ func TestMonitorPrepareInitialRow(t *testing.T) {
 	tableSchema := createTestTableSchema()
 	data := map[string]interface{}{"c1": "v1", "c2": "v2"}
 	expectedUUID := guuid.NewString()
-	data[libovsdb.COL_UUID] = libovsdb.UUID{GoUUID: expectedUUID}
+	data[libovsdb.ColUUID] = libovsdb.UUID{GoUUID: expectedUUID}
 	data1Json, err := json.Marshal(data)
 	assert.Nilf(t, err, "marshalling %v, threw %v", data, err)
 	testMonitorPrepareInitialRow_(t, tableSchema, &data1Json, expectedUUID, true)
@@ -338,7 +338,7 @@ func TestMonitorPrepareInsertRow(t *testing.T) {
 	tableSchema := createTestTableSchema()
 	expectedUUID := guuid.NewString()
 	data := map[string]interface{}{"c1": "v1", "c2": "v2"}
-	data[libovsdb.COL_UUID] = libovsdb.UUID{GoUUID: expectedUUID}
+	data[libovsdb.ColUUID] = libovsdb.UUID{GoUUID: expectedUUID}
 	dataJson, err := json.Marshal(data)
 	assert.Nilf(t, err, "marshalling %v, threw %v", data, err)
 
@@ -375,7 +375,7 @@ func TestMonitorPrepareDeleteRow(t *testing.T) {
 	tableSchema := createTestTableSchema()
 	expectedUUID := guuid.NewString()
 	data := map[string]interface{}{"c1": "v1", "c2": "v2"}
-	data[libovsdb.COL_UUID] = libovsdb.UUID{GoUUID: expectedUUID}
+	data[libovsdb.ColUUID] = libovsdb.UUID{GoUUID: expectedUUID}
 	dataJson, err := json.Marshal(data)
 	assert.Nilf(t, err, "marshalling %v, threw %v", data, err)
 
@@ -413,7 +413,7 @@ func TestMonitorPrepareModifyRow(t *testing.T) {
 	tableSchema := createTestTableSchema()
 	expectedUUID := guuid.NewString()
 	data := map[string]interface{}{"c1": "v1", "c2": "v2", "c3": "v3"}
-	data[libovsdb.COL_UUID] = libovsdb.UUID{GoUUID: expectedUUID}
+	data[libovsdb.ColUUID] = libovsdb.UUID{GoUUID: expectedUUID}
 	data1Json, err := json.Marshal(data)
 	assert.Nilf(t, err, "marshalling %v, threw %v", data, err)
 
@@ -460,7 +460,7 @@ func TestMonitorPrepareModifyMapRow(t *testing.T) {
 	expectedUUID := guuid.NewString()
 	colMap := libovsdb.OvsMap{GoMap: map[interface{}]interface{}{"k1": "v1", "k2": "v2", "k3": "v3"}}
 	data := map[string]interface{}{"c1": "v1", MAP_COLUMN: colMap}
-	data[libovsdb.COL_UUID] = libovsdb.UUID{GoUUID: expectedUUID}
+	data[libovsdb.ColUUID] = libovsdb.UUID{GoUUID: expectedUUID}
 	data1Json, err := json.Marshal(data)
 	assert.Nilf(t, err, "marshalling %v, threw %v", data, err)
 
@@ -495,7 +495,7 @@ func TestMonitorPrepareModifySetRow(t *testing.T) {
 	expectedUUID := guuid.NewString()
 	colSet := libovsdb.OvsSet{GoSet: []interface{}{"e1", "e2"}}
 	data := map[string]interface{}{"c1": "v1", SET_COLUMN: colSet}
-	data[libovsdb.COL_UUID] = libovsdb.UUID{GoUUID: expectedUUID}
+	data[libovsdb.ColUUID] = libovsdb.UUID{GoUUID: expectedUUID}
 	data1Json, err := json.Marshal(data)
 	assert.Nilf(t, err, "marshalling %v, threw %v", data, err)
 
@@ -544,7 +544,7 @@ func TestMonitorModifyRowMap(t *testing.T) {
 	}
 
 	data := map[string]interface{}{}
-	data[libovsdb.COL_UUID] = libovsdb.UUID{GoUUID: guuid.NewString()}
+	data[libovsdb.ColUUID] = libovsdb.UUID{GoUUID: guuid.NewString()}
 	goMap := map[string]interface{}{}
 	goMap["theSame"] = "v1"
 	goMap["newKey"] = "v1"
@@ -886,7 +886,7 @@ func initHandler(t *testing.T, jsonValue string, notificationType ovsjson.Update
 
 func prepareData(t *testing.T, data map[string]interface{}, withUUID bool) []byte {
 	if withUUID {
-		data[libovsdb.COL_UUID] = libovsdb.UUID{GoUUID: ROW_UUID}
+		data[libovsdb.ColUUID] = libovsdb.UUID{GoUUID: ROW_UUID}
 	}
 	dataJson, err := json.Marshal(data)
 	assert.Nilf(t, err, "marshalling %v, threw %v", data, err)
@@ -983,7 +983,7 @@ func TestMonitorCondChange(t *testing.T) {
 	}
 	addUuidToRow := func(rowIn map[string]interface{}) (rowOut map[string]interface{}) {
 		expectedUUID := ROW_UUID
-		rowIn[libovsdb.COL_UUID] = libovsdb.UUID{GoUUID: expectedUUID}
+		rowIn[libovsdb.ColUUID] = libovsdb.UUID{GoUUID: expectedUUID}
 		return rowIn
 	}
 	handlerCallToPrepareRow := func(rowInWithoutUUID map[string]interface{}) map[string]interface{} {

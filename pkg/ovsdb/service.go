@@ -206,8 +206,8 @@ type Servicer interface {
 }
 
 const (
-	INT_SERVER    = "_Server"
-	INT_DATABASES = "Database"
+	InternalServer   = "_Server"
+	InternalDatabase = "Database"
 )
 
 type Service struct {
@@ -217,13 +217,13 @@ type Service struct {
 
 func (s *Service) ListDbs(ctx context.Context, param interface{}) ([]string, error) {
 	klog.V(5).Info("ListDbs request")
-	dbCache, err := s.db.GetDBCache(INT_SERVER)
+	dbCache, err := s.db.GetDBCache(InternalServer)
 	if err != nil {
 		return nil, err
 	}
-	tCache := dbCache.getTable(INT_DATABASES)
-	dbs := make([]string, 0, len(*tCache))
-	for key, _ := range *tCache {
+	tCache := dbCache.getTableCache(InternalDatabase)
+	dbs := make([]string, 0, tCache.size())
+	for key, _ := range tCache.uuidIndex {
 		dbs = append(dbs, key)
 	}
 	klog.V(5).Infof("ListDbs returned %v", dbs)

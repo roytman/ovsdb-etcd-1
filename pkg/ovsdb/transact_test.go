@@ -360,7 +360,7 @@ func TestTransactInsertSimple(t *testing.T) {
 			{
 				Op:    libovsdb.OperationSelect,
 				Table: &table,
-				Where: &[]interface{}{[]interface{}{libovsdb.COL_UUID, FN_EQ, *uuid}},
+				Where: &[]interface{}{[]interface{}{libovsdb.ColUUID, FN_EQ, *uuid}},
 			},
 		},
 	}
@@ -463,7 +463,7 @@ func TestTransactInsertSimpleWithUUID(t *testing.T) {
 			{
 				Op:    libovsdb.OperationSelect,
 				Table: &table,
-				Where: &[]interface{}{[]interface{}{libovsdb.COL_UUID, FN_EQ, uuid}},
+				Where: &[]interface{}{[]interface{}{libovsdb.ColUUID, FN_EQ, uuid}},
 			},
 		},
 	}
@@ -562,7 +562,7 @@ func TestTransactInsertSimpleWithUUIDName(t *testing.T) {
 			{
 				Op:    libovsdb.OperationSelect,
 				Table: &table,
-				Where: &[]interface{}{[]interface{}{libovsdb.COL_UUID, FN_EQ, *uuid}},
+				Where: &[]interface{}{[]interface{}{libovsdb.ColUUID, FN_EQ, *uuid}},
 			},
 		},
 	}
@@ -711,7 +711,7 @@ func TestTransactAtomicInsertNamedUUID(t *testing.T) {
 			{
 				Op:    libovsdb.OperationSelect,
 				Table: &table,
-				Where: &[]interface{}{[]interface{}{libovsdb.COL_UUID, FN_EQ, uuid1}},
+				Where: &[]interface{}{[]interface{}{libovsdb.ColUUID, FN_EQ, uuid1}},
 			},
 		},
 	}
@@ -800,7 +800,7 @@ func TestTransactInsertEnumOk(t *testing.T) {
 			{
 				Op:    libovsdb.OperationSelect,
 				Table: &table,
-				Where: &[]interface{}{[]interface{}{libovsdb.COL_UUID, FN_EQ, *uuid}},
+				Where: &[]interface{}{[]interface{}{libovsdb.ColUUID, FN_EQ, *uuid}},
 			},
 		},
 	}
@@ -858,7 +858,7 @@ func TestTransactInsertSetOk(t *testing.T) {
 			{
 				Op:    libovsdb.OperationSelect,
 				Table: &table,
-				Where: &[]interface{}{[]interface{}{libovsdb.COL_UUID, FN_EQ, *uuid}},
+				Where: &[]interface{}{[]interface{}{libovsdb.ColUUID, FN_EQ, *uuid}},
 			},
 		},
 	}
@@ -990,7 +990,7 @@ func TestTransactUpdateMT(t *testing.T) {
 			Op:    libovsdb.OperationUpdate,
 			Table: &table,
 			Row:   &row2,
-			Where: &[]interface{}{[]interface{}{libovsdb.COL_UUID, FN_EQ, uuids[i]}},
+			Where: &[]interface{}{[]interface{}{libovsdb.ColUUID, FN_EQ, uuids[i]}},
 		}
 	}
 	ops = append(ops, libovsdb.Operation{Op: libovsdb.OperationUpdate, Table: &table, Row: &row3})
@@ -1011,7 +1011,7 @@ func TestTransactUpdateMT(t *testing.T) {
 		ops[i] = libovsdb.Operation{
 			Op:      libovsdb.OperationSelect,
 			Table:   &table,
-			Where:   &[]interface{}{[]interface{}{libovsdb.COL_UUID, FN_EQ, uuids[i]}},
+			Where:   &[]interface{}{[]interface{}{libovsdb.ColUUID, FN_EQ, uuids[i]}},
 			Columns: &[]string{"key1", "key2"},
 		}
 	}
@@ -1062,7 +1062,7 @@ func TestTransactUpdateMapOk(t *testing.T) {
 				Op:    libovsdb.OperationUpdate,
 				Table: &table,
 				Row:   &row2,
-				Where: &[]interface{}{[]interface{}{libovsdb.COL_UUID, FN_EQ, *uuid}},
+				Where: &[]interface{}{[]interface{}{libovsdb.ColUUID, FN_EQ, *uuid}},
 			},
 		},
 	}
@@ -1076,7 +1076,7 @@ func TestTransactUpdateMapOk(t *testing.T) {
 			{
 				Op:    libovsdb.OperationSelect,
 				Table: &table,
-				Where: &[]interface{}{[]interface{}{libovsdb.COL_UUID, FN_EQ, *uuid}},
+				Where: &[]interface{}{[]interface{}{libovsdb.ColUUID, FN_EQ, *uuid}},
 			},
 		},
 	}
@@ -1308,7 +1308,7 @@ func TestTransactMutateSetUUID(t *testing.T) {
 				Op:        libovsdb.OperationMutate,
 				Table:     &table,
 				Mutations: &mutations,
-				Where:     &[]interface{}{[]interface{}{libovsdb.COL_UUID, FN_EQ, goUUID}},
+				Where:     &[]interface{}{[]interface{}{libovsdb.ColUUID, FN_EQ, goUUID}},
 			},
 		},
 	}
@@ -1483,7 +1483,7 @@ func TestTransactInsertTwoNamedUUID(t *testing.T) {
 			{
 				Op:    libovsdb.OperationSelect,
 				Table: &table,
-				Where: &[]interface{}{[]interface{}{libovsdb.COL_UUID, FN_EQ, goUUID1}},
+				Where: &[]interface{}{[]interface{}{libovsdb.ColUUID, FN_EQ, goUUID1}},
 			},
 		},
 	}
@@ -1735,7 +1735,7 @@ func TestTransactDelete(t *testing.T) {
 			{
 				Op:    libovsdb.OperationDelete,
 				Table: &table,
-				Where: &[]interface{}{[]interface{}{libovsdb.COL_UUID, FN_EQ, goUUID}},
+				Where: &[]interface{}{[]interface{}{libovsdb.ColUUID, FN_EQ, goUUID}},
 			},
 		},
 	}
@@ -1758,7 +1758,7 @@ func TestTransactDelete(t *testing.T) {
 			{
 				Op:    libovsdb.OperationSelect,
 				Table: &table,
-				Where: &[]interface{}{[]interface{}{libovsdb.COL_UUID, FN_EQ, goUUID}},
+				Where: &[]interface{}{[]interface{}{libovsdb.ColUUID, FN_EQ, goUUID}},
 			},
 		},
 	}
@@ -2180,7 +2180,7 @@ func TestTransactSelect(t *testing.T) {
 			{
 				Op:    libovsdb.OperationSelect,
 				Table: &table,
-				Where: &[]interface{}{[]interface{}{libovsdb.COL_UUID, FN_EQ, goUUID}},
+				Where: &[]interface{}{[]interface{}{libovsdb.ColUUID, FN_EQ, goUUID}},
 			},
 		},
 	}
@@ -2190,7 +2190,7 @@ func TestTransactSelect(t *testing.T) {
 			{
 				Op:    libovsdb.OperationSelect,
 				Table: &table,
-				Where: &[]interface{}{[]interface{}{libovsdb.COL_UUID, FN_EX, goUUID}},
+				Where: &[]interface{}{[]interface{}{libovsdb.ColUUID, FN_EX, goUUID}},
 			},
 		},
 	}
@@ -2218,7 +2218,7 @@ func TestTransactSelect(t *testing.T) {
 	validateSelectResult(t, resp, 1, 0, 2)
 	for i := 0; i < 2; i++ {
 		row := (*resp.Result[0].Rows)[i]
-		iUUID, err := libovsdb.UnmarshalUUID(row[libovsdb.COL_UUID])
+		iUUID, err := libovsdb.UnmarshalUUID(row[libovsdb.ColUUID])
 		assert.Nil(t, err)
 		goUUID, ok := iUUID.(libovsdb.UUID)
 		assert.True(t, ok)

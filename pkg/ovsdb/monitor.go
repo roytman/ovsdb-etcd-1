@@ -742,7 +742,7 @@ func (u *updater) prepareRow(row *libovsdb.Row) (map[string]interface{}, string,
 		return nil, "", err
 	}
 	data = u.copySelectedColumns(data)
-	delete(data, libovsdb.COL_UUID)
+	delete(data, libovsdb.ColUUID)
 	return data, uuid.GoUUID, nil
 }
 
