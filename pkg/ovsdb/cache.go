@@ -2,7 +2,9 @@ package ovsdb
 
 import (
 	"context"
+	"fmt"
 	"sync"
+	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
@@ -70,8 +72,15 @@ func (c *cache) addDatabaseCache(dbName string, etcdClient *clientv3.Client, log
 }
 
 func (dc *databaseCache) updateCache(events []*clientv3.Event) {
+	dc.log.V(3).Info("updateCache before Lock")
+	start := time.Now()
 	dc.mu.Lock()
-	defer dc.mu.Unlock()
+	dc.log.V(3).Info("updateCache got Lock", "duration", fmt.Sprintf("%s", time.Now().Sub(start)))
+	defer func() {
+		dc.mu.Unlock()
+		dc.log.V(3).Info("updateCache after Lock", "duration", fmt.Sprintf("%s", time.Now().Sub(start)))
+	}()
+
 	for _, event := range events {
 		key, err := common.ParseKey(string(event.Kv.Key))
 		if err != nil {
@@ -91,8 +100,13 @@ func (dc *databaseCache) updateCache(events []*clientv3.Event) {
 }
 
 func (dc *databaseCache) putEtcdKV(kvs []*mvccpb.KeyValue) error {
+	dc.log.V(3).Info("cache putEtcdKV before Lock")
 	dc.mu.Lock()
-	defer dc.mu.Unlock()
+	dc.log.V(3).Info("cache putEtcdKV got Lock")
+	defer func() {
+		dc.mu.Unlock()
+		dc.log.V(3).Info("cache putEtcdKV after Lock")
+	}()
 	for _, kv := range kvs {
 		if kv == nil {
 			continue

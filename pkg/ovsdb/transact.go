@@ -325,6 +325,8 @@ func (txn *Transaction) getGenerateUUID(ovsOp *libovsdb.Operation) (string, erro
 }
 
 func (txn *Transaction) Commit() (int64, error) {
+	start := time.Now()
+
 	txn.log.V(5).Info("commit transaction")
 	var err error
 
@@ -358,8 +360,14 @@ Loop:
 	}
 
 	processOperations := func() error {
+		txn.log.V(3).Info("txn before cache r-lock")
+		start := time.Now()
 		txn.cache.mu.RLock()
-		defer txn.cache.mu.RUnlock()
+		txn.log.V(3).Info("txn got cache r-lock", "duration", fmt.Sprintf("%s", time.Now().Sub(start)))
+		defer func() {
+			txn.cache.mu.RUnlock()
+			txn.log.V(3).Info("txn after cache r-lock", "duration", fmt.Sprintf("%s", time.Now().Sub(start)))
+		}()
 		// insert name-uuid preprocessing
 		for i, ovsOp := range txn.request.Operations {
 			if ovsOp.Op == libovsdb.OperationInsert {
@@ -410,6 +418,7 @@ Loop:
 			}
 			break
 		}
+		txn.log.V(3).Info(E_CONCURRENCY_ERROR, "i", i, "trx", txn.etcdTrx.String())
 		txn.log.V(5).Info(E_CONCURRENCY_ERROR, "trx", txn.etcdTrx.String())
 		// let's try again
 		txn.etcdTrx.clear()
@@ -420,6 +429,7 @@ Loop:
 	if !trResponse.Succeeded {
 		return -1, errors.New(E_INTERNAL_ERROR)
 	}
+	txn.log.V(3).Info("txn done", "duration", fmt.Sprintf("%s", time.Now().Sub(start)), "trx", txn.etcdTrx.String())
 	return trResponse.Header.Revision, nil
 }
 

@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/creachadair/jrpc2"
 	"github.com/go-logr/logr"
@@ -49,6 +50,7 @@ type Handler struct {
 }
 
 func (ch *Handler) Transact(ctx context.Context, params []interface{}) (interface{}, error) {
+	start := time.Now()
 	req := jrpc2.InboundRequest(ctx)
 	id := ""
 	if !req.IsNotification() {
@@ -80,9 +82,13 @@ func (ch *Handler) Transact(ctx context.Context, params []interface{}) (interfac
 	if err != nil {
 		return nil, errors.New(E_INTERNAL_ERROR)
 	}
+	txn.log.V(3).Info("txn before handler r-lock")
+	str := time.Now()
 	ch.mu.RLock()
+	txn.log.V(3).Info("txn got handler r-lock", "duration", fmt.Sprintf("%s", time.Now().Sub(str)))
 	monitor, thereIsMonitor := ch.monitors[txn.request.DBName]
 	ch.mu.RUnlock()
+	txn.log.V(3).Info("txn after handler r-lock")
 	if thereIsMonitor {
 		monitor.tQueue.startTransaction()
 	}
@@ -100,10 +106,13 @@ func (ch *Handler) Transact(ctx context.Context, params []interface{}) (interfac
 		wg.Add(1)
 		monitor.tQueue.endTransaction(rev, &wg)
 		log.V(5).Info("transact added", "etcdTrx revision", rev)
+		txn.log.V(3).Info("txn before wait")
 		wg.Wait()
+		txn.log.V(3).Info("txn after wait")
 	}
 
 	log.V(5).Info("transact response", "response", txn.response, "etcdTrx revision", rev)
+	txn.log.V(3).Info("txn-end", "duration", fmt.Sprintf("%s", time.Now().Sub(start)), "txn size", len(txn.request.Operations))
 	return txn.response.Result, nil
 }
 
@@ -542,8 +551,14 @@ func (ch *Handler) getMonitoredData(dbName string, updatersMap Key2Updaters) (ov
 		return nil, err
 	}
 	returnData := ovsjson.TableUpdates{}
+	ch.log.V(3).Info("handler getMonitoredData before r-lock")
+	start := time.Now()
 	dbCache.mu.RLock()
-	defer dbCache.mu.RUnlock()
+	ch.log.V(3).Info("handler getMonitoredData got r-lock", "duration", fmt.Sprintf("%s", time.Now().Sub(start)))
+	defer func() {
+		dbCache.mu.RUnlock()
+		ch.log.V(3).Info("handler getMonitoredData after got r-lock", "duration", fmt.Sprintf("%s", time.Now().Sub(start)))
+	}()
 	for tableKey, updaters := range updatersMap {
 		if len(updaters) == 0 {
 			// nothing to update
