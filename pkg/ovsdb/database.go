@@ -233,7 +233,6 @@ func (con *DatabaseEtcd) StartLeaderElection() {
 			if err != nil {
 				con.log.Error(err, "Leader Election error", "serverId", con.serverID)
 			} else {
-				con.log.V(1).Info("err is nil")
 				break
 			}
 		}

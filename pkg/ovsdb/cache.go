@@ -95,6 +95,7 @@ func (c *cache) addDatabaseCache(dbSchema *libovsdb.DatabaseSchema, etcdClient *
 	(*c)[dbName] = dbCache
 	// we don't need etcd watcher
 	if etcdClient == nil {
+		// this is daatacache for _Server, we don't store it in etcd
 		return nil
 	}
 	ctxt := context.Background()
@@ -126,6 +127,25 @@ func (c *cache) addDatabaseCache(dbSchema *libovsdb.DatabaseSchema, etcdClient *
 			dbCache.updateCache(wresp.Events)
 		}
 	}()
+	// we have got and stored initial data, let's rig off possible GC orphances from it.
+	orphans := dbCache.initialGCCleanup()
+	if len(orphans) > 0 {
+		etcdTxn := etcdTransaction{ctx: ctx, cli: etcdClient}
+		for tableName, uuidList := range orphans {
+			for _, uuid := range uuidList {
+				key := common.NewDataKey(dbName, tableName, uuid)
+				etcdTxn.appendThen(clientv3.OpDelete(key.String()))
+			}
+		}
+		resp, err := etcdTxn.commit()
+		if err != nil {
+			log.Error(err, "orphans remove transaction failed")
+			return err
+		}
+		if resp.Succeeded {
+			log.V(5).Info("orphans remote transaction succeeded", "orphans", len(etcdTxn.then))
+		}
+	}
 	return nil
 }
 
@@ -142,6 +162,40 @@ func (dc *databaseCache) getRow(key common.Key) (cachedRow, bool) {
 	tCache := dc.getTable(key.TableName)
 	row, ok := tCache.rows[key.UUID]
 	return row, ok
+}
+
+func (dc *databaseCache) initialGCCleanup() map[string][]string {
+	// [tableName][uuids]
+	orphans := map[string][]string{}
+	refCounter := refCounter{}
+	for tableName, tCache := range dc.dbCache {
+		if ! tCache.tSchema.IsRoot {
+			for uuid, cRow := range tCache.rows {
+				if cRow.counter < 1 {
+					dc.log.V(5).Info("Found an orphan", "table", tableName, "uuid", uuid, "refCounter", cRow.counter)
+					tList, ok := orphans[tableName]
+					if !ok {
+						tList = []string{}
+					}
+					tList = append(tList, uuid)
+					orphans[tableName] = tList
+					for cName, destTable := range tCache.refColumns {
+						val := cRow.row.Fields[cName]
+						if val == nil {
+							continue
+						}
+						cSchema, _ := tCache.tSchema.LookupColumn(cName)
+						checkCounters(nil, val, cSchema.Type)
+						refCounter.updateCounters(destTable, checkCounters(nil, val, cSchema.Type))
+					}
+				}
+			}
+		}
+	}
+	if len(refCounter) > 0 {
+		gc()
+	}
+	return orphans
 }
 
 func (dc *databaseCache) updateCache(events []*clientv3.Event) {
@@ -198,36 +252,6 @@ func (dc *databaseCache) storeValues(kvs []*mvccpb.KeyValue) error {
 	dc.updateRows(rows)
 	return nil
 }
-
-/*
-func (dc *databaseCache) deleteCounters(newVal interface{}, oldVal interface{}, columnType string, refTable *tableCache ) {
-	if columnType == libovsdb.TypeSet {
-		valSet, ok := newVal.(libovsdb.OvsSet)
-		if !ok {
-			// TODO
-		}
-		for _, uuid := range valSet.GoSet {
-			ovsUUID := uuid.(libovsdb.UUID)
-			cRow, ok := refTable.rows[ovsUUID.GoUUID]
-			if ok {
-				cRow.counter--
-			}
-		}
-	} else if columnType == libovsdb.TypeMap {
-		valMap, ok := newVal.(libovsdb.OvsMap)
-		if !ok {
-			// TODO
-		}
-		for _, v := range valMap.GoMap {
-			ovsUUID, _ := v.(libovsdb.UUID)
-			cRow, ok := refTable.rows[ovsUUID.GoUUID]
-			if ok {
-				cRow.counter--
-			}
-		}
-	}
-}
-*/
 
 func (dc *databaseCache) updateCountersSet(newVal interface{}, oldVal interface{}, refTable *tableCache, tableKey *common.Key, newRows map[common.Key]*cachedRow) {
 	newValSet := interfaceToSet(newVal)

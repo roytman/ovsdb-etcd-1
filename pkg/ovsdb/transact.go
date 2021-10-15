@@ -646,13 +646,13 @@ func makeValue(row *map[string]interface{}) (string, error) {
 	return string(b), nil
 }
 
-func setRowUUID(row *map[string]interface{}, uuid string) {
-	(*row)[libovsdb.ColUuid] = libovsdb.UUID{GoUUID: uuid}
+func setRowUUID(row map[string]interface{}, uuid string) {
+	row[libovsdb.ColUuid] = libovsdb.UUID{GoUUID: uuid}
 }
 
-func setRowVersion(row *map[string]interface{}) {
+func setRowVersion(row map[string]interface{}) {
 	version := common.GenerateUUID()
-	(*row)[libovsdb.ColVersion] = libovsdb.UUID{GoUUID: version}
+	row[libovsdb.ColVersion] = libovsdb.UUID{GoUUID: version}
 }
 
 /*func (txn *Transaction) getUUIDIfExists(tableSchema *libovsdb.TableSchema, mapUUID namedUUIDResolver, cond1 interface{}) (string, error) {
@@ -899,7 +899,7 @@ func (txn *Transaction) doInsert(ovsOp *libovsdb.Operation, ovsResult *libovsdb.
 	key := common.NewDataKey(txn.request.DBName, *ovsOp.Table, uuid)
 	row := &map[string]interface{}{}
 
-	*row = *ovsOp.Row
+	row = ovsOp.Row
 	txn.schema.Default(*ovsOp.Table, row)
 
 	err = txn.rowPrepare(tableSchema, txn.mapUUID, ovsOp.Row)
@@ -908,8 +908,8 @@ func (txn *Transaction) doInsert(ovsOp *libovsdb.Operation, ovsResult *libovsdb.
 		err = errors.New(ErrConstraintViolation)
 		return
 	}
-	setRowUUID(row, uuid)
-	setRowVersion(row)
+	setRowUUID(*row, uuid)
+	setRowVersion(*row)
 	k := key.String()
 	val, e := makeValue(row)
 	if e != nil {
@@ -970,7 +970,7 @@ func (txn *Transaction) doModify(ovsOp *libovsdb.Operation, ovsResult *libovsdb.
 				return
 			}
 		}
-		setRowVersion(newRow)
+		setRowVersion(*newRow)
 		err = txn.etcdModifyRow([]byte(key), newRow, version)
 		if err != nil {
 			return

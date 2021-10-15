@@ -2151,6 +2151,7 @@ func TestTransactCommit(t *testing.T) {
 			},
 		},
 	}
+	testEtcdCleanup(t)
 	resp := testTransact(t, req, testSchemaSimple, -1)
 	validateOperationError(t, resp, 1, 0, ErrNotSupported)
 }
@@ -2164,6 +2165,7 @@ func TestTransactAbort(t *testing.T) {
 			},
 		},
 	}
+	testEtcdCleanup(t)
 	resp := testTransact(t, req, testSchemaSimple, -1)
 	validateOperationError(t, resp, 1, 0, ErrAborted)
 }
@@ -2411,6 +2413,7 @@ func TestTransactGCUpdate(t *testing.T) {
 			},
 		},
 	}
+	testEtcdCleanup(t)
 	resp := testTransact(t, req, testSchemaGC, 3)
 	validateUpdateResult(t, resp, 1, 0, 1)
 	req = &libovsdb.Transact{
@@ -2449,6 +2452,7 @@ func TestTransactGCDelete(t *testing.T) {
 			},
 		},
 	}
+	testEtcdCleanup(t)
 	resp := testTransact(t, req, testSchemaGC, 3)
 	validateUpdateResult(t, resp, 1, 0, 1)
 	req = &libovsdb.Transact{
@@ -2468,4 +2472,38 @@ func TestTransactGCDelete(t *testing.T) {
 	resp = testTransact(t, req, testSchemaGC, 0)
 	validateSelectResult(t, resp, 2, 0, 0)
 	validateSelectResult(t, resp, 2, 1, 0)
+}
+
+func TestInitialGCCleanup(t *testing.T) {
+	table1 := "table1"
+	table2 := "table2"
+	dbName := "gc"
+	t1RowUUID := common.GenerateUUID()
+	t2RowUUID := common.GenerateUUID()
+	//table1RowUUID := libovsdb.UUID{GoUUID: table1UUIDNamed}
+	//table2RowUUID := libovsdb.UUID{GoUUID: table2UUIDNamed}
+
+	t1Row := map[string]interface{}{
+		"name":   "t1",
+		"refSet": libovsdb.OvsSet{GoSet: []interface{}{libovsdb.UUID{GoUUID: t2RowUUID}}},
+	}
+
+	t2Row := map[string]interface{}{
+		"name":  "t2",
+	}
+	testEtcdCleanup(t)
+	testEtcdPut(t, dbName, table1, t1RowUUID, t1Row)
+	testEtcdPut(t, dbName, table2, t2RowUUID, t2Row)
+
+	cli, err := testEtcdNewCli()
+	assert.Nil(t, err)
+	defer func() {
+		err := cli.Close()
+		assert.Nil(t, err)
+	}()
+	cache := cache{}
+	ctx := context.Background()
+	err = cache.addDatabaseCache(ctx, testSchemaGC, cli, log)
+	assert.Nil(t, err)
+
 }

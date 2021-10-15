@@ -397,3 +397,7 @@ func TestCacheCheckMap(t *testing.T) {
 	assert.Equal(t, 0, counts[val1UUID.GoUUID])
 	assert.Equal(t, 0, counts[val2UUID.GoUUID])
 }
+
+func TestInitialCounters(t *testing.T) {
+
+}
