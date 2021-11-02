@@ -287,6 +287,20 @@ func (lc *localCache) getLocalTableCache(tableName string) localTableCache {
 	return table
 }
 
+type operationDuration struct {
+	name     string
+	duration time.Duration
+}
+
+type txnTimeStamps struct {
+	txnStart               time.Time
+	txnProcess             []time.Duration
+	etcdTxnProcess         []time.Duration
+	cacheLockAchievement   []time.Duration
+	monitorLockAchievement time.Duration
+	operationDuration      [][]operationDuration
+}
+
 type Transaction struct {
 	/* logger */
 	log logr.Logger
@@ -303,10 +317,9 @@ type Transaction struct {
 	/* the server cache */
 	cache *databaseCache // dbCache -> map[tableName]tableCache -> rows -> map[uuid]->cachedRow
 	/* the current transaction cache with results from the previous operations */
-	localCache     *localCache //  [tableName]localTableCache -> map[full common.Key.String()]map[ColumnName]interface{}
-	txnStart       time.Time
-	txnProcess     []time.Duration
-	etcdTxnProcess []time.Duration
+	localCache *localCache //  [tableName]localTableCache -> map[full common.Key.String()]map[ColumnName]interface{}
+
+	timeStamps txnTimeStamps
 }
 
 func NewTransaction(ctx context.Context, cli *clientv3.Client, request *libovsdb.Transact, cache *databaseCache, schema *libovsdb.DatabaseSchema, dbLocks *databaseLocks, log logr.Logger) (*Transaction, error) {
@@ -403,12 +416,16 @@ func (txn *Transaction) Commit() (int64, error) {
 			}
 		}
 	}
+	var startProcessOperations time.Time
+	var gotCacheLock time.Time
 	processOperations := func() error {
-		// TODO try to replace Lock to RLock
 		txn.cache.mu.RLock()
 		defer txn.cache.mu.RUnlock()
+		gotCacheLock = time.Now()
 
+		var opsDuration []operationDuration
 		for i, ovsOp := range txn.request.Operations {
+			startOperation := time.Now()
 			err = txn.doOperation(&ovsOp, &txn.response.Result[i])
 			if err != nil {
 				errStr := err.Error()
@@ -416,26 +433,32 @@ func (txn *Transaction) Commit() (int64, error) {
 				//txn.response.Error = &errStr
 				return err
 			}
+			opsDuration = append(opsDuration, operationDuration{name: ovsOp.Op, duration: time.Now().Sub(startOperation)})
 		}
+		beforeGC := time.Now()
 		txn.gc()
+		opsDuration = append(opsDuration, operationDuration{name: "gc", duration: time.Now().Sub(beforeGC)})
+		txn.timeStamps.operationDuration = append(txn.timeStamps.operationDuration, opsDuration)
 		return nil
 	}
 	var trResponse *clientv3.TxnResponse
 	// TODO add configuration flag to iteration number
 	for i := 0; i < 10; i++ {
+		startProcessOperations = time.Now()
 		err = processOperations()
 		if err != nil {
 			return -1, err
 		}
 		beforeEtcdtxn := time.Now()
-		txn.txnProcess = append(txn.txnProcess, beforeEtcdtxn.Sub(txn.txnStart))
+		txn.timeStamps.txnProcess = append(txn.timeStamps.txnProcess, beforeEtcdtxn.Sub(startProcessOperations))
+		txn.timeStamps.cacheLockAchievement = append(txn.timeStamps.cacheLockAchievement, gotCacheLock.Sub(startProcessOperations))
 		//txn.log.V(1).Info("Before etcdTransact", "i", i, "timeBeforeEtcd", fmt.Sprintf("%s", beforeEtcdtxn.Sub(txn.txnStart)), "txnSize", len(txn.request.Operations), "etcdTxnSize", txn.etcdTrx.ifSize()+txn.etcdTrx.thenSize())
 		trResponse, err = txn.etcdTransaction()
 		if err != nil {
 			txn.log.Error(err, "etcd trx error", "cmpSize", txn.etcdTrx.ifSize(), "thenSize", txn.etcdTrx.thenSize())
 			return -1, err
 		}
-		txn.etcdTxnProcess = append(txn.etcdTxnProcess, time.Now().Sub(beforeEtcdtxn))
+		txn.timeStamps.etcdTxnProcess = append(txn.timeStamps.etcdTxnProcess, time.Now().Sub(beforeEtcdtxn))
 		//afterEtcdtxn := time.Now()
 		//txn.log.V(1).Info("After etcdTransact", "i", i, "etcdTxnDuration", fmt.Sprintf("%s", afterEtcdtxn.Sub(beforeEtcdtxn)), "etcdTxnSize", txn.etcdTrx.ifSize()+txn.etcdTrx.thenSize())
 		if trResponse.Succeeded {

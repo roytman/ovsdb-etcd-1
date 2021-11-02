@@ -84,13 +84,18 @@ func (ch *Handler) Transact(ctx context.Context, params []interface{}) (interfac
 	if err != nil {
 		return nil, errors.New(ErrInternalError)
 	}
-	txn.txnStart = txnStart
+	txn.timeStamps.txnStart = txnStart
+	beforeMonLock := time.Now()
 	ch.mu.RLock()
+	txn.timeStamps.monitorLockAchievement = time.Now().Sub(beforeMonLock)
 	monitor, thereIsMonitor := ch.monitors[txn.request.DBName]
 	ch.mu.RUnlock()
+
+	queueStartTxn := time.Now()
 	if thereIsMonitor {
 		monitor.tQueue.startTransaction()
 	}
+	endStartQueueTxn := time.Now()
 	rev, errC := txn.Commit()
 	if errC != nil {
 		if thereIsMonitor {
@@ -104,16 +109,22 @@ func (ch *Handler) Transact(ctx context.Context, params []interface{}) (interfac
 		var wg sync.WaitGroup
 		wg.Add(1)
 		monitor.tQueue.endTransaction(rev, &wg)
+		endQueueTxn := time.Now()
 		log.V(5).Info("transact added", "etcdTrx revision", rev)
 		beforeNotifWait := time.Now()
 		wg.Wait()
-		afterNotifWait := time.Now()
+		afterNotifyWait := time.Now()
 		txn.log.V(4).Info("AfterNotificationWait",
-			"notifWait", fmt.Sprintf("%s", afterNotifWait.Sub(beforeNotifWait)),
-			"txnDuration", fmt.Sprintf("%s", afterNotifWait.Sub(txnStart)),
-			"txnProcess", fmt.Sprintf("%v", txn.txnProcess),
-			"etcdTxn", fmt.Sprintf("%v", txn.etcdTxnProcess),
+			"notifWait", fmt.Sprintf("%s", afterNotifyWait.Sub(beforeNotifWait)),
+			"txnDuration", fmt.Sprintf("%s", afterNotifyWait.Sub(txnStart)),
+			"monitorLockAchiev", fmt.Sprintf("%s", txn.timeStamps.monitorLockAchievement),
+			"txnProcess", fmt.Sprintf("%v", txn.timeStamps.txnProcess),
+			"etcdTxn", fmt.Sprintf("%v", txn.timeStamps.etcdTxnProcess),
+			"cacheLock", fmt.Sprintf("%v", txn.timeStamps.cacheLockAchievement),
 			"txnSize", len(txn.request.Operations),
+			"queueStartTxn", fmt.Sprintf("%s", endStartQueueTxn.Sub(queueStartTxn)),
+			"queueTxn", fmt.Sprintf("%s", endQueueTxn.Sub(endStartQueueTxn)),
+			"operationDuration", fmt.Sprintf("%v", txn.timeStamps.operationDuration),
 			"etcdTxnSize", txn.etcdTrx.ifSize()+txn.etcdTrx.thenSize())
 	}
 
